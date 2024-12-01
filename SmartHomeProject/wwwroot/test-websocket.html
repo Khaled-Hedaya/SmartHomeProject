@@ -1,50 +1,95 @@
 ﻿<!DOCTYPE html>
 <html>
 <head>
-    <!-- SignalR client library -->
+    <title>Smart Home Device Test Interface</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.1/signalr.js"></script>
-
-    <!-- Styling for the test interface -->
     <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+
         .device-card {
             border: 1px solid #ccc;
             padding: 15px;
             margin: 10px;
             border-radius: 5px;
+            background-color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
+
         .status-log {
             height: 200px;
             overflow-y: auto;
             border: 1px solid #ccc;
             padding: 10px;
             margin-top: 10px;
+            background-color: #fff;
+            font-family: monospace;
         }
-        .success { color: green; }
-        .error { color: red; }
+
+        .success {
+            color: green;
+        }
+
+        .error {
+            color: red;
+        }
+
+        button {
+            padding: 8px 16px;
+            margin: 5px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            background-color: #fff;
+            cursor: pointer;
+        }
+
+            button:hover {
+                background-color: #f0f0f0;
+            }
+
+        input, select {
+            padding: 8px;
+            margin: 5px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            width: 200px;
+        }
     </style>
 </head>
 <body>
-    <!-- Device Control Section -->
     <div class="device-card">
         <h3>Device Control</h3>
-        <input type="text" id="itemId" placeholder="Item ID">
-        <select id="stateType">
-            <option value="power">Power</option>
-            <option value="brightness">Brightness</option>
-            <option value="temperature">Temperature</option>
-        </select>
-        <input type="number" id="stateValue" placeholder="Value">
+        <div>
+            <input type="text" id="itemId" placeholder="Item ID (GUID)">
+        </div>
+        <div>
+            <select id="stateType">
+                <option value="POWER">POWER</option>
+                <option value="BRIGHTNESS">BRIGHTNESS</option>
+                <option value="TEMPERATURE">TEMPERATURE</option>
+            </select>
+        </div>
+        <div>
+            <input type="text" id="stateValue" placeholder="Value">
+        </div>
         <button onclick="updateState()">Update State</button>
+        <button onclick="checkDatabaseState()">Check Current State</button>
     </div>
 
-    <!-- Connection Status Section -->
     <div class="device-card">
         <h3>Connection Status: <span id="connectionStatus">Disconnected</span></h3>
         <button onclick="connect()">Connect</button>
         <button onclick="disconnect()">Disconnect</button>
     </div>
 
-    <!-- Event Log Section -->
+    <div class="device-card">
+        <h3>Current State</h3>
+        <div id="databaseState" class="status-log"></div>
+    </div>
+
     <div class="device-card">
         <h3>Event Log</h3>
         <div id="eventLog" class="status-log"></div>
@@ -53,15 +98,15 @@
     <script>
         let connection = null;
 
-        // Helper function to log events
         function logEvent(message, isError = false) {
             const eventLog = document.getElementById('eventLog');
             const timestamp = new Date().toLocaleTimeString();
-            const cssClass = isError ? 'error' : 'success';
-            eventLog.innerHTML = `<div class="${cssClass}">[${timestamp}] ${message}</div>` + eventLog.innerHTML;
+            const logEntry = document.createElement('div');
+            logEntry.className = isError ? 'error' : 'success';
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            eventLog.insertBefore(logEntry, eventLog.firstChild);
         }
 
-        // Connect to SignalR hub
         async function connect() {
             try {
                 connection = new signalR.HubConnectionBuilder()
@@ -69,73 +114,85 @@
                     .withAutomaticReconnect()
                     .build();
 
-                // Listen for state change events
-                connection.on("ItemStateChanged", (itemId, state, value) => {
-                    logEvent(`Item ${itemId} state changed: ${state} = ${value}`);
-                });
+                // Handle state updates from other clients
+                connection.on("ReceiveStateUpdate", (data) => {
+                    const currentItemId = document.getElementById('itemId').value;
 
-                // Handle connection close
-                connection.onclose(() => {
-                    document.getElementById('connectionStatus').textContent = 'Disconnected';
-                    logEvent('Connection closed', true);
+                    // Always show notification for any item update
+                    logEvent(`Item "${data.itemName}" (${data.itemId}) updated: ${data.state} = ${data.value}`);
+
+                    // If it's the current item, refresh the state display
+                    if (currentItemId === data.itemId) {
+                        checkDatabaseState();
+                    }
                 });
 
                 await connection.start();
                 document.getElementById('connectionStatus').textContent = 'Connected';
-                logEvent('Connected to hub');
+                logEvent('Connected to SignalR hub');
             } catch (err) {
+                document.getElementById('connectionStatus').textContent = 'Error';
                 logEvent(`Connection error: ${err}`, true);
-            }
-        }
-
-        // Disconnect from hub
-        async function disconnect() {
-            if (connection) {
-                await connection.stop();
                 connection = null;
             }
         }
 
-        // Update item state
+        async function disconnect() {
+            if (connection) {
+                try {
+                    await connection.stop();
+                    document.getElementById('connectionStatus').textContent = 'Disconnected';
+                    logEvent('Disconnected from hub');
+                    connection = null;
+                } catch (err) {
+                    logEvent(`Error disconnecting: ${err}`, true);
+                }
+            }
+        }
+
         async function updateState() {
             const itemId = document.getElementById('itemId').value;
             const state = document.getElementById('stateType').value;
-            const value = parseInt(document.getElementById('stateValue').value);
+            const value = document.getElementById('stateValue').value;
 
-            if (!itemId || isNaN(value)) {
+            if (!itemId || !state || !value) {
                 logEvent('Please fill in all fields', true);
                 return;
             }
 
             try {
-                // Make API call to update state
-                const response = await fetch(`/api/items/${itemId}/state`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ state, value })
-                });
+                if (connection && connection.state === signalR.HubConnectionState.Connected) {
+                    // Send via SignalR
+                    await connection.invoke("UpdateItemState", itemId, state, value);
+                    logEvent(`State update sent via SignalR: ${state} = ${value}`);
+                    // Update local state immediately for the sender
+                    await checkDatabaseState();
+                } else {
+                    // Fallback to REST API
+                    const response = await fetch(`/api/items/${itemId}/state`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            State: state,
+                            Value: value
+                        })
+                    });
 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.errors ? errorData.errors.join(', ') : 'Unknown error');
+                    }
+
+                    logEvent(`State updated via API: ${state} = ${value}`);
+                    await checkDatabaseState();
                 }
-
-                logEvent(`State update request sent: ${state} = ${value}`);
             } catch (err) {
                 logEvent(`Error updating state: ${err}`, true);
             }
         }
-    </script>
-    <!-- Add this section to test-websocket.html -->
-    <div class="device-card">
-        <h3>Database State</h3>
-        <button onclick="checkDatabaseState()">Refresh Database State</button>
-        <div id="databaseState" class="status-log"></div>
-    </div>
 
-    <script>
-        // Add this function
         async function checkDatabaseState() {
             const itemId = document.getElementById('itemId').value;
             if (!itemId) {
@@ -144,27 +201,35 @@
             }
 
             try {
-                const response = await fetch(`/api/items/${itemId}`);
+                const response = await fetch(`/api/items/${itemId}/state`);
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    const errorData = await response.json();
+                    throw new Error(errorData.errors ? errorData.errors.join(', ') : `HTTP error! status: ${response.status}`);
                 }
-                const data = await response.json();
 
-                const dbStateDiv = document.getElementById('databaseState');
-                dbStateDiv.innerHTML = `
-                    <div>
-                        <strong>Item Name:</strong> ${data.name}<br>
-                        <strong>States:</strong><br>
-                        ${data.actions.map(a =>
-                    `${a.state}: ${a.value} (Updated: ${new Date(a.updatedAt).toLocaleString()})`
-                ).join('<br>')}
-                    </div>
-                `;
-                logEvent('Database state refreshed');
+                const result = await response.json();
+                if (result.success && result.data) {
+                    const data = result.data;
+                    const dbStateDiv = document.getElementById('databaseState');
+                    dbStateDiv.innerHTML = `
+                                <div>
+                                    <strong>Item Name:</strong> ${data.name}<br>
+                                    <strong>Item ID:</strong> ${data.id}<br>
+                                    <strong>States:</strong><br>
+                                    ${data.states ? data.states.map(s =>
+                        `- ${s.state}: ${s.value} (Updated: ${new Date(s.updatedAt).toLocaleString()})`
+                    ).join('<br>') : 'No states recorded'}
+                                </div>
+                            `;
+                    logEvent('Database state refreshed');
+                }
             } catch (err) {
                 logEvent(`Error checking database state: ${err}`, true);
             }
         }
+
+        // Auto-connect when page loads
+        connect();
     </script>
 </body>
 </html>

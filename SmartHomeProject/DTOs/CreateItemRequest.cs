@@ -15,6 +15,6 @@ namespace SmartHomeProject.DTOs
         [StringLength(50)]
         public string MacIp { get; set; }
 
-        public int LastVersionNumber { get; set; } = 1;
+        public string LastVersionNumber { get; set; } = "1";
     }
 }

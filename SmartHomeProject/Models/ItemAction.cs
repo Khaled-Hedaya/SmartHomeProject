@@ -1,13 +1,13 @@
-﻿namespace SmartHomeProject.Models
+﻿using System;
+
+namespace SmartHomeProject.Models
 {
     public class ItemAction : BaseEntity
     {
-        public Guid Id { get; set; }
         public Guid ItemId { get; set; }
-        public string State { get; set; } = "State";
-        public int Value { get; set; } = 0;
+        public string State { get; set; }
+        public string Value { get; set; }
 
-        // Navigation property
-        public virtual Item Item { get; set; }
+        public Item Item { get; set; }
     }
 }

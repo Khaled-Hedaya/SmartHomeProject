@@ -4,13 +4,13 @@
     {
         public Guid Id { get; set; }
         public string Name { get; set; }
-        public List<ItemActionDto> States { get; set; } = new List<ItemActionDto>();
+        public List<StateInfo> States { get; set; }
     }
 
-    public class ItemActionDto
+    public class StateInfo
     {
         public string State { get; set; }
-        public int Value { get; set; }
+        public string Value { get; set; }
         public DateTime UpdatedAt { get; set; }
     }
 }

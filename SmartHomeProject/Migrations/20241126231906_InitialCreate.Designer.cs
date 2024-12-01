@@ -5,13 +5,14 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using SmartHomeProject.Data;
 
 #nullable disable
 
 namespace SmartHomeProject.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20241122194258_InitialCreate")]
+    [Migration("20241126231906_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -24,45 +25,6 @@ namespace SmartHomeProject.Migrations
 
             MySqlModelBuilderExtensions.AutoIncrementColumns(modelBuilder);
 
-            modelBuilder.Entity("SmartHomeProject.Models.Complaint", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("char(36)");
-
-                    b.Property<string>("Content")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<Guid>("ItemId")
-                        .HasColumnType("char(36)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("char(36)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ItemId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("Complaints");
-                });
-
             modelBuilder.Entity("SmartHomeProject.Models.Item", b =>
                 {
                     b.Property<Guid>("Id")
@@ -72,14 +34,12 @@ namespace SmartHomeProject.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
 
-                    b.Property<bool>("DoUpdateNow")
-                        .HasColumnType("tinyint(1)");
-
                     b.Property<bool>("IsAssigned")
                         .HasColumnType("tinyint(1)");
 
-                    b.Property<int>("LastVersionNumber")
-                        .HasColumnType("int");
+                    b.Property<string>("LastVersionNumber")
+                        .IsRequired()
+                        .HasColumnType("longtext");
 
                     b.Property<string>("MacIp")
                         .IsRequired()
@@ -131,8 +91,9 @@ namespace SmartHomeProject.Migrations
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime(6)");
 
-                    b.Property<int>("Value")
-                        .HasColumnType("int");
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("longtext");
 
                     b.HasKey("Id");
 
@@ -218,7 +179,7 @@ namespace SmartHomeProject.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
-                    b.Property<string>("Title")
+                    b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("longtext");
 
@@ -241,10 +202,9 @@ namespace SmartHomeProject.Migrations
 
                     b.Property<string>("Email")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("varchar(255)");
 
                     b.Property<string>("Image")
-                        .IsRequired()
                         .HasColumnType("longtext");
 
                     b.Property<string>("Password")
@@ -260,69 +220,22 @@ namespace SmartHomeProject.Migrations
 
                     b.Property<string>("Username")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("varchar(255)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Email")
+                        .IsUnique();
+
+                    b.HasIndex("Username")
+                        .IsUnique();
 
                     b.ToTable("Users");
                 });
 
-            modelBuilder.Entity("SmartHomeProject.Models.VoiceCommand", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("char(36)");
-
-                    b.Property<string>("ActionName")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("ActionState")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("Command")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<Guid>("ItemId")
-                        .HasColumnType("char(36)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ItemId");
-
-                    b.ToTable("VoiceCommands");
-                });
-
-            modelBuilder.Entity("SmartHomeProject.Models.Complaint", b =>
-                {
-                    b.HasOne("SmartHomeProject.Models.Item", "Item")
-                        .WithMany()
-                        .HasForeignKey("ItemId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("SmartHomeProject.Models.User", "User")
-                        .WithMany("Complaints")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Item");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("SmartHomeProject.Models.Item", b =>
                 {
-                    b.HasOne("SmartHomeProject.Models.Product", "Product")
+                    b.HasOne("SmartHomeProject.Models.Product", null)
                         .WithMany("Items")
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -330,13 +243,13 @@ namespace SmartHomeProject.Migrations
 
                     b.HasOne("SmartHomeProject.Models.Room", "Room")
                         .WithMany("Items")
-                        .HasForeignKey("RoomId");
+                        .HasForeignKey("RoomId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("SmartHomeProject.Models.User", "User")
                         .WithMany("Items")
-                        .HasForeignKey("UserId");
-
-                    b.Navigation("Product");
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Room");
 
@@ -365,22 +278,9 @@ namespace SmartHomeProject.Migrations
                     b.Navigation("Product");
                 });
 
-            modelBuilder.Entity("SmartHomeProject.Models.VoiceCommand", b =>
-                {
-                    b.HasOne("SmartHomeProject.Models.Item", "Item")
-                        .WithMany("VoiceCommands")
-                        .HasForeignKey("ItemId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Item");
-                });
-
             modelBuilder.Entity("SmartHomeProject.Models.Item", b =>
                 {
                     b.Navigation("Actions");
-
-                    b.Navigation("VoiceCommands");
                 });
 
             modelBuilder.Entity("SmartHomeProject.Models.Product", b =>
@@ -397,8 +297,6 @@ namespace SmartHomeProject.Migrations
 
             modelBuilder.Entity("SmartHomeProject.Models.User", b =>
                 {
-                    b.Navigation("Complaints");
-
                     b.Navigation("Items");
                 });
 #pragma warning restore 612, 618

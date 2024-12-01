@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using SmartHomeProject.Common;
 using SmartHomeProject.DTOs;
 using SmartHomeProject.Models;
 using SmartHomeProject.Services;
@@ -7,80 +8,145 @@ namespace SmartHomeProject.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Produces("application/json")]
     public class UsersController : ControllerBase
     {
         private readonly IUserService _userService;
+        private readonly ILogger<UsersController> _logger;
 
-        public UsersController(IUserService userService)
+        public UsersController(IUserService userService, ILogger<UsersController> logger)
         {
             _userService = userService;
+            _logger = logger;
         }
 
         // GET: api/users
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<User>>> GetUsers()
+        [ProducesResponseType(typeof(ApiResponse<IEnumerable<UserDto>>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<ApiResponse<IEnumerable<UserDto>>>> GetUsers()
         {
             var users = await _userService.GetAllAsync();
-            return Ok(users);
+            return Ok(ApiResponse<IEnumerable<UserDto>>.Ok(users));
         }
 
         // GET: api/users/{id}
         [HttpGet("{id}")]
-        public async Task<ActionResult<User>> GetUser(Guid id)
+        [ProducesResponseType(typeof(ApiResponse<UserDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<ApiResponse<UserDto>>> GetUser(Guid id)
         {
             var user = await _userService.GetByIdAsync(id);
             if (user == null)
-                return NotFound();
-            return Ok(user);
+                return NotFound(ApiResponse<UserDto>.Error(
+                    new List<string> { "User not found" },
+                    StatusCodes.Status404NotFound));
+
+            return Ok(ApiResponse<UserDto>.Ok(user));
         }
 
         // POST: api/users
         [HttpPost]
-        public async Task<ActionResult<User>> CreateUser(CreateUserRequest request)
+        [ProducesResponseType(typeof(ApiResponse<UserDto>), StatusCodes.Status201Created)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<ApiResponse<UserDto>>> CreateUser(CreateUserRequest request)
         {
             if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+                return BadRequest(ApiResponse<UserDto>.Error(
+                    ModelState.Values
+                        .SelectMany(v => v.Errors)
+                        .Select(e => e.ErrorMessage)
+                        .ToList()));
 
-            var user = new User
+            try
             {
-                Username = request.Username,
-                Email = request.Email,
-                Phone = request.Phone,
-                Password = request.Password,
-                Image = request.Image
-            };
+                var user = new User
+                {
+                    Username = request.Username,
+                    Email = request.Email,
+                    Phone = request.Phone,
+                    Password = request.Password,
+                    Image = request.Image
+                };
 
-            var createdUser = await _userService.CreateAsync(user);
-            return CreatedAtAction(nameof(GetUser), new { id = createdUser.Id }, createdUser);
+                var createdUser = await _userService.CreateAsync(user);
+                var response = ApiResponse<UserDto>.Ok(createdUser);
+                return CreatedAtAction(
+                    nameof(GetUser),
+                    new { id = createdUser.Id },
+                    response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating user");
+                return BadRequest(ApiResponse<UserDto>.Error(
+                    new List<string> { "Error creating user" }));
+            }
         }
 
         // PUT: api/users/{id}
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateUser(Guid id, UpdateUserRequest request)
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult> UpdateUser(Guid id, UpdateUserRequest request)
+    {
+    if (!ModelState.IsValid)
+        return BadRequest(ApiResponse<object>.Error(
+            ModelState.Values
+                .SelectMany(v => v.Errors)
+                .Select(e => e.ErrorMessage)
+                .ToList()));
+
+        try
         {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+            var existingUser = await _userService.GetByIdAsync(id);
+            if (existingUser == null)
+                return NotFound(ApiResponse<object>.Error(
+                    new List<string> { "User not found" },
+                    StatusCodes.Status404NotFound));
 
-            var user = await _userService.GetByIdAsync(id);
-            if (user == null)
-                return NotFound();
+            // Get the original user from the database through the service
+            var originalUser = await _userService.GetOriginalUserAsync(id);
+            if (originalUser == null)
+                return NotFound(ApiResponse<object>.Error(
+                    new List<string> { "User not found" },
+                    StatusCodes.Status404NotFound));
 
-            user.Username = request.Username;
-            user.Email = request.Email;
-            user.Phone = request.Phone;
-            user.Image = request.Image;
+            // Map the update request to the existing user
+            var user = new User
+            {
+                Id = id,
+                Username = request.Username,
+                Email = request.Email,
+                Phone = request.Phone,
+                Image = request.Image,
+                Password = originalUser.Password, // Use the password from original user
+                CreatedAt = originalUser.CreatedAt,
+                UpdatedAt = DateTime.UtcNow
+            };
 
             await _userService.UpdateAsync(user);
             return NoContent();
         }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating user");
+            return BadRequest(ApiResponse<object>.Error(
+                new List<string> { "Error updating user" }));
+        }
+    }
 
         // DELETE: api/users/{id}
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteUser(Guid id)
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<ActionResult> DeleteUser(Guid id)
         {
             var user = await _userService.GetByIdAsync(id);
             if (user == null)
-                return NotFound();
+                return NotFound(ApiResponse<object>.Error(
+                    new List<string> { "User not found" },
+                    StatusCodes.Status404NotFound));
 
             await _userService.DeleteAsync(id);
             return NoContent();

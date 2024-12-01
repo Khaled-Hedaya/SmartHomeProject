@@ -1,12 +1,12 @@
-﻿namespace SmartHomeProject.Models
+﻿using System;
+using System.Collections.Generic;
+
+namespace SmartHomeProject.Models
 {
     public class Room : BaseEntity
-    {
-        public Guid Id { get; set; }
-        public string Title { get; set; } = "Room";
-        public string ImageUrl { get; set; }
-
-        // Navigation properties
-        public virtual ICollection<Item> Items { get; set; }
-    }
+{
+    public string Name { get; set; }
+    public string ImageUrl { get; set; }
+    public ICollection<Item> Items { get; set; } = new List<Item>();
+}
 }

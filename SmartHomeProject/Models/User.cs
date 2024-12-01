@@ -1,22 +1,16 @@
-﻿using SmartHomeProject.Models;
+﻿using System;
+using System.Collections.Generic;
 
-public class User : BaseEntity
+namespace SmartHomeProject.Models
 {
-    public User()
+    public class User : BaseEntity
     {
-        // Initialize collections in constructor
-        Items = new List<Item>();
-        Complaints = new List<Complaint>();
+        public string Username { get; set; }
+        public string Email { get; set; }
+        public string Phone { get; set; }
+        public string Password { get; set; }
+        public string? Image { get; set; }
+
+        public ICollection<Item> Items { get; set; } = new List<Item>();
     }
-
-    public Guid Id { get; set; }
-    public string Username { get; set; }
-    public string Phone { get; set; }
-    public string Email { get; set; }
-    public string Password { get; set; }
-    public string Image { get; set; }
-
-    // Navigation properties
-    public virtual ICollection<Item> Items { get; set; }
-    public virtual ICollection<Complaint> Complaints { get; set; }
 }

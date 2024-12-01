@@ -1,45 +1,27 @@
-/*
-var builder = WebApplication.CreateBuilder(args);
-
-// Add services to the container.
-
-builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-
-var app = builder.Build();
-
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-
-app.UseHttpsRedirection();
-
-app.UseAuthorization();
-
-app.MapControllers();
-
-app.Run();
-*/
-
 using Microsoft.EntityFrameworkCore;
-using SmartHomeProject.Hubs;
-using SmartHomeProject.Services;
-
 using Microsoft.OpenApi.Models;
+using SmartHomeProject.Data;
+using SmartHomeProject.Hubs;
+using SmartHomeProject.Middleware;
+using SmartHomeProject.Services;
+using SmartHomeProject.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo 
+    { 
+        Title = "Smart Home API", 
+        Version = "v1",
+        Description = "API for Smart Home Device Management"
+    });
+});
 
-// Configure Database
+// Add DbContext
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySql(
         builder.Configuration.GetConnectionString("DefaultConnection"),
@@ -47,39 +29,72 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     ));
 
 // Register Services
-builder.Services.AddScoped<IItemService, ItemService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IItemService, ItemService>();
+builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
+builder.Services.AddScoped<ItemStateValidator>();
 
-// Add SignalR
 builder.Services.AddSignalR();
 
-// Add CORS
+
+// Add Logging
+builder.Services.AddLogging(logging =>
+{
+    logging.ClearProviders();
+    logging.AddConsole();
+    logging.AddDebug();
+ //   logging.AddFile(builder.Configuration.GetSection("Logging:File"));
+});
+
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", builder =>
     {
-        builder
-            .AllowAnyOrigin()
-            .AllowAnyMethod()
-            .AllowAnyHeader();
+        builder.AllowAnyOrigin()
+               .AllowAnyMethod()
+               .AllowAnyHeader();
     });
 });
 
+
 var app = builder.Build();
 
-// Configure the HTTP request pipeline
-if (app.Environment.IsDevelopment())
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Smart Home API V1");
+    c.RoutePrefix = "api-docs"; // This will serve the Swagger UI at /api-docs
+    // Optional: Add basic authentication
+    c.ConfigObject.AdditionalItems["syntaxHighlight"] = new Dictionary<string, object>
+    {
+        ["activated"] = true
+    };
+});
 
-app.UseHttpsRedirection();
-app.UseCors("AllowAll");
 
-app.MapControllers();
-app.MapHub<SmartHomeHub>("/smarthomeHub");
+// Configure the HTTP request pipeline
+//if (app.Environment.IsDevelopment())
+//{
+    
+//}
+//else
+//{
+//    app.UseExceptionHandler("/Errors");
+//    app.UseHsts();
+//}
+
 
 app.UseStaticFiles();
+app.UseDefaultFiles();
+app.UseCors("AllowAll");
+app.UseHttpsRedirection();
+app.UseGlobalExceptionHandler(); // Add global exception handler
+app.UseAuthorization();
+app.UseRouting();
+app.MapHub<SmartHomeHub>("/smarthomeHub");
+app.MapControllers();
+
+app.MapFallbackToFile("index.html");
 
 app.Run();

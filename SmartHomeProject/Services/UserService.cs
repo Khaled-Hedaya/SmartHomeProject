@@ -1,4 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using SmartHomeProject.Data;
+using SmartHomeProject.DTOs;
 using SmartHomeProject.Models;
 
 namespace SmartHomeProject.Services
@@ -6,45 +8,41 @@ namespace SmartHomeProject.Services
     public class UserService : IUserService
     {
         private readonly ApplicationDbContext _context;
+        private readonly ILogger<UserService> _logger;
 
-        public UserService(ApplicationDbContext context)
+        private readonly IPasswordHasher _passwordHasher;
+
+        public UserService(ApplicationDbContext context, ILogger<UserService> logger, IPasswordHasher passwordHasher)
         {
             _context = context;
+            _logger = logger;
+            _passwordHasher = passwordHasher;
         }
 
-        public async Task<User> GetByIdAsync(Guid id)
+        public async Task<IEnumerable<UserDto>> GetAllAsync()
         {
-            return await _context.Users
-                .Include(u => u.Items)
-                .FirstOrDefaultAsync(u => u.Id == id);
+            var users = await _context.Users.ToListAsync();
+            return users.Select(MapToDto);
         }
 
-        public async Task<User> CreateAsync(User user)
+        public async Task<UserDto> GetByIdAsync(Guid id)
         {
-            user.Id = Guid.NewGuid();
+            var user = await _context.Users.FindAsync(id);
+            return user != null ? MapToDto(user) : null;
+        }
+
+        public async Task<UserDto> CreateAsync(User user)
+        {
+            user.Password = _passwordHasher.HashPassword(user.Password);
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
-            return user;
+            return MapToDto(user);
         }
 
-        public async Task<IEnumerable<User>> GetAllAsync()
+        public async Task UpdateAsync(User user)
         {
-            return await _context.Users.ToListAsync();
-        }
-
-        public async Task<User> UpdateAsync(User user)
-        {
-            var existingUser = await _context.Users.FindAsync(user.Id);
-            if (existingUser == null)
-                throw new KeyNotFoundException("User not found");
-
-            existingUser.Username = user.Username;
-            existingUser.Email = user.Email;
-            existingUser.Phone = user.Phone;
-            existingUser.Image = user.Image;
-
+            _context.Entry(user).State = EntityState.Modified;
             await _context.SaveChangesAsync();
-            return existingUser;
         }
 
         public async Task DeleteAsync(Guid id)
@@ -55,6 +53,24 @@ namespace SmartHomeProject.Services
                 _context.Users.Remove(user);
                 await _context.SaveChangesAsync();
             }
+        }
+        public async Task<User> GetOriginalUserAsync(Guid id)
+        {
+            return await _context.Users.FindAsync(id);
+        }
+
+        private static UserDto MapToDto(User user)
+        {
+            return new UserDto
+            {
+                Id = user.Id,
+                Username = user.Username,
+                Email = user.Email,
+                Phone = user.Phone,
+                Image = user.Image,
+                CreatedAt = user.CreatedAt,
+                UpdatedAt = user.UpdatedAt
+            };
         }
     }
 }

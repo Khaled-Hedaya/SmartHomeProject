@@ -8,6 +8,6 @@ namespace SmartHomeProject.DTOs
         public string State { get; set; }
 
         [Required]
-        public int Value { get; set; }
+        public string Value { get; set; }
     }
 }
